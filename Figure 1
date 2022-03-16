@@ -1,0 +1,843 @@
+setwd('E:/work_backup/MG20180831_fxa_methy')
+load('test.clinical.RData')
+load('test.data.RData')
+load('test.cox.result.RData')
+load('vd.cox.result.RData')
+
+dim(test.data)
+dim(vd.data)
+177*2
+
+head(cox.result)
+head(test.clinical[,1:9])
+
+table(test.clinical[,3])
+coxFun=function(dat){
+  #print(dim(dat))
+  #dat=data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),factor(test.clinical[,4],ordered = T))
+  #head(dat)
+  #dat=data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),as.numeric(as.character(test.clinical[,9])))
+  #dat=data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0)
+  #               ,factor(clinical.genter,ordered = T))
+  dat=dat[which(!is.na(dat[,3])),]
+  colnames(dat)=c('time','status','gene')
+  fmla <- as.formula("Surv(time, status) ~gene")
+  cox <- coxph(fmla, data =dat)
+  print(summary(cox))
+  #p <- coef(summary(cox))[1,5]
+  p<-anova(cox)[[4]][2]
+  return(p)
+  #result=c(p,summary(cox)[[8]][1],summary(cox)[[8]][3],summary(cox)[[8]][4])
+  #return(result)
+}
+
+library(survival)
+
+clinical.T=as.character(test.clinical[,3])
+table(clinical.T)
+clinical.T[which(clinical.T=='TX')]=NA
+clinical.T[which(clinical.T=='Tis')]=NA
+clinical.T[grep('T4',clinical.T)]='T4'
+clinical.T[grep('T3',clinical.T)]='T3'
+clinical.T[grep('T1',clinical.T)]='T1'
+clinical.T[grep('T2',clinical.T)]='T2'
+clinical.T[which(clinical.T=='')]=NA
+table(clinical.T)
+
+clinical.N=as.character(test.clinical[,4])
+table(clinical.N)
+clinical.N[which(clinical.N=='NX'|clinical.N=='')]=NA
+clinical.N[grep('N2',clinical.N)]='N2'
+clinical.N[grep('N1',clinical.N)]='N1'
+table(clinical.N)
+
+clinical.M=as.character(test.clinical[,5])
+table(clinical.M)
+clinical.M[which(clinical.M=='')]=NA
+clinical.M[grep('M1',clinical.M)]='M1'
+table(clinical.M)
+
+clinical.Stage=as.character(test.clinical[,6])
+table(clinical.Stage)
+clinical.Stage<-gsub("[ABC]","",clinical.Stage,perl=T)
+clinical.Stage[which(clinical.Stage=='')]=NA
+clinical.Stage[which(clinical.Stage=='Stage 0')]=NA
+table(clinical.Stage)
+
+head(test.clinical[,1:10])
+
+clinical.age=as.numeric(as.character(test.clinical$age_at_initial_pathologic_diagnosis))
+clinical.genter=as.character(test.clinical$gender)
+table(clinical.genter)
+clinical.tsh=as.numeric(test.clinical$tobacco_smoking_history)
+clinical.syear=as.numeric(test.clinical$stopped_smoking_year)-as.numeric(test.clinical$year_of_tobacco_smoking_onset)
+BiocManager::install('')
+
+test.clinical$drugs.drug.drug_name
+table(test.clinical$histological_type)
+drugs.drug.drug_name
+test.clinical$drugs.drug.measure_of_response
+
+mg_cl
+
+
+#coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),as.character(test.clinical[,3])))
+
+factor(test.clinical[,4],ordered = T)
+
+ct=coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),factor(clinical.T,ordered = T)))
+cn=coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),factor(clinical.N,ordered = T)))
+cm=coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),factor(clinical.M,ordered = T)))
+cs=coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),factor(clinical.Stage,ordered = T)))
+cage=coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),clinical.age))
+csomk=coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),clinical.tsh,ordered = T))
+
+sum(cox.result[,1]<0.05)
+
+csex=coxFun(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0)
+                       ,factor(clinical.genter,ordered = T)))
+
+
+ct
+cn
+cm
+cs
+cage
+csomk
+csex
+
+dim(test.data)
+
+dat2=data.frame(factor(clinical.T,ordered = T),factor(clinical.N,ordered = T)
+                ,factor(clinical.Stage,ordered = T)
+                )
+
+colnames(dat2)=c('T','N','Stage')
+
+coxFunMutil=function(dat1,dat2){
+  colnames(dat1)=c('time','status','gene')
+  inds=which(apply(dat2,1,function(x){return(sum(is.na(x)))})==0)
+  #paste0(colnames(dat2),collapse = '+')
+  fmla <- as.formula(paste0("Surv(time, status) ~gene",'+'
+                            ,paste0('strata(',colnames(dat2)[1:(ncol(dat2))],')'
+                                    ,collapse = '+')))
+  dat=as.data.frame(cbind(dat1,dat2))
+  dat=dat[inds,]
+  cox <- coxph(fmla, data =dat)
+  p <- coef(summary(cox))[1,5]
+  result=c(p,summary(cox)[[8]][1],summary(cox)[[8]][3],summary(cox)[[8]][4])
+  return(result)
+}
+sum((cox.result[,1]<0.05))
+muti.cox.result=apply(test.data[which(cox.result[,1]<0.05),],1,function(x){
+  dt=as.numeric(x);  
+  time=test.clinical[,1]
+  status=ifelse(test.clinical[,2]=='Dead',1,0)
+  return(coxFunMutil(data.frame(time,status,dt),dat2))
+})
+muti.cox.result=t(muti.cox.result)
+muti.cox.result1=muti.cox.result
+colnames(muti.cox.result1)=colnames(cox.result)
+head(muti.cox.result)
+
+sum(muti.cox.result1[,1]<0.05)
+#length(which(p.adjust(muti.cox.result1)<0.05))
+
+p.adjust(muti.cox.result[,1])
+length(which(p.adjust(muti.cox.result[,1])<0.05))
+muti.cox.result=as.numeric(muti.cox.result[,1])
+names(muti.cox.result)=row.names(muti.cox.result1)
+write.table(muti.cox.result1,file = 'muti.cox.result.txt',sep = '\t',quote = F)
+sig.cpgs=names(muti.cox.result[which(muti.cox.result<0.05)])
+length(sig.cpgs)
+
+save(muti.cox.result,file="muti.cox.result.RData")
+load('muti.cox.result.RData')
+library(ConsensusClusterPlus)
+
+dim(test.data)
+
+rcc1 = ConsensusClusterPlus(test.data[match(sig.cpgs,row.names(test.data)),],maxK=10,reps=100,pItem=0.8
+                           ,pFeature=1,title="cons",distance="euclidean",clusterAlg="km"
+                           ,seed = 1262118388.71279
+                           #,plot = 'pdf'
+                           )
+rcc=rcc1
+save(rcc1,file="ConsensusClusterPlus.result.RData")
+load('ConsensusClusterPlus.result.RData')
+
+table(rcc1[[7]]$consensusClass)
+
+source('Z:/projects/codes/mg_base.R')
+
+enrich=ssGSEA_batch(TCGAcode = 'LUAD')
+cmp=intersect(colnames(enrich$KEGG),
+names(rcc1[[7]]$consensusClass))
+rcc.mch=rcc1[[7]]$consensusClass[match(cmp,names(rcc1[[7]]$consensusClass))]
+rcc.kegg=enrich$KEGG[,match(cmp,colnames(enrich$KEGG))]
+all.dt=t(apply(rcc.kegg, 1, function(x){
+  all=c()
+  for(i in 1:7){
+    inds=which(rcc.mch==i)
+    es1=x[inds]
+    es2=x[-inds]
+    pv=t.test(es1,es2)$p.value
+    fc=mean(es1)/mean(es2)
+    all=c(all,fc,pv)
+  }
+  return(all)
+}))
+dim(all.dt)
+head(all.dt)
+
+all.dt.fc=all.dt[,seq(1,14,2)]
+all.dt.pv=all.dt[,seq(2,14,2)]
+inds.1=which(apply(all.dt.pv, 1, function(x){
+  return(sum(x<0.05))
+})==1)
+colnames(all.dt.fc)=paste0('C',1:7)
+row.names(all.dt.fc)=gsub('KEGG_','',enrich$ID_Map$V1[match(row.names(all.dt.fc),enrich$ID_Map$V3)])
+mheatmap(as.matrix(all.dt.fc[inds.1,])
+         ,scale = 'row',display_numbers = T,legend = 'ES Foldchange',cutree_rows = 7
+         ,cluster_cols = F,color = circlize::colorRamp2(c(-2, 0, 2), c('green', 'white', 'red')))
+
+annotation_row = data.frame(
+  SampleClass = factor(rcc1[[7]]$consensusClass)
+  ,Stage=clinical.Stage
+  ,M=clinical.M
+#  ,Grade=clinical.Grade
+  ,T=clinical.T
+  ,N=clinical.N
+)
+rownames(annotation_row) = names(rcc[[7]]$consensusClass)
+
+head(test.sig.data)
+
+test.sig.data=test.data[match(sig.cpgs,row.names(test.data)),]
+save(test.sig.data,file="test.sig.RData")
+load("test.sig.RData")
+
+library(pheatmap)
+pheatmap(test.sig.data[,rcc[[7]]$consensusTree$order]
+         ,cluster_cols = F
+         ,annotation_col = annotation_row
+         ,show_rownames = F,show_colnames = F)
+
+rc7=rcc[[7]]$consensusClass
+
+test.sig.data.scale=scale(t(test.sig.data))
+bt=rbind()
+for(i in 1:7){
+  val=c()
+  for(j in 1:nrow(test.sig.data)){
+    val=c(val,test.sig.data.scale[which(rc7==i),j])
+  }
+  stg=rep(paste0('C',i),length(val))
+  bt=rbind(bt,cbind(val,stg))
+}
+bt=as.data.frame(bt)
+bt[,1]=as.numeric(as.character(bt[,1]))
+boxplot(val ~ stg, data = bt, 
+        outline = FALSE,     ## avoid double-plotting outliers, if any
+        main = ''
+        ,col=rainbow(5)
+        ,ylab='z-score(CpG methylation)'
+        ,xlab='Cluster'
+)
+head(bt)
+all.dt=cbind()
+for(i in 1:7){
+  all.dt=cbind(all.dt,bt[which(bt[,2]==paste0('C',i))  ,1])
+}
+dim(all.dt)
+head(all.dt)
+dim(bt[which(bt[,2]==paste0('C',i))  ,])
+head(bt)
+fig1D=mg_violin(data.frame(bt[,2],bt[,1]),melt = T,jitter=F,show_compare=T,ylab = 'z-score(CpG methylation)')
+savePDF('Fig1D.pdf',plot = fig1D,width = 6,height = 8)
+
+
+test.clinical.new=getTCGAClinicalBySamples(row.names(test.clinical))
+#MG_Grobal_System='win'
+head(test.clinical.new)
+test.clinical.new$A10_Tumor_Size
+test.clinical.new$A9_Cancer_Status
+
+all.drugs=rbind()
+for(i in 1:length(test.clinical.new$drugs.drug.measure_of_response)){
+  x=test.clinical.new$drugs.drug.measure_of_response[i]
+  xs=unlist(strsplit(x,';'))
+  if(length(xs)==0){
+    xs=NA
+  }
+  all.drugs=rbind(all.drugs,cbind(i,xs))
+}
+unique(all.drugs[,2])
+all.drugs=all.drugs[all.drugs[,2]%in%c('Complete Response','Clinical Progressive Disease','Partial Response','Stable Disease'),]
+head(all.drugs)
+all.drugs=unique(all.drugs)
+
+table(all.drugs[,2],rc7[as.numeric(all.drugs[,1])])
+
+fig3s1=plotMutiBar(table(all.drugs[,2],paste0('Cluster',rc7[as.numeric(all.drugs[,1])])))
+fig3s2=plotMutiBar(table(test.clinical.new$gender,paste0('Cluster',rc7)))
+
+
+plotKMCox=function(dat){
+  colnames(dat)=c('time','status','groups')
+  sdf<-survdiff(Surv(time,status) ~ groups,data=dat)
+  print((sdf))
+  p<-pchisq(sdf$chisq,length(sdf$n)-1,lower.tail=FALSE)
+  sf<-survfit(Surv(time,status) ~ groups,data=dat)
+  colKm=rainbow(length(sf$strata))
+  plot(sf, mark.time = TRUE,col=colKm,xlab=paste("Survival time in day","\np=",round(p,5)),ylab = "Survival probabilities",main="Method Kaplan Meier")
+  legend('topright',gsub('groups=','',names(sf$strata)), col = colKm,lty = c(1,1, 1, 1),lwd=c(1,1,1,1),merge = TRUE)
+  return(p)
+}
+
+rcc=rcc1
+rccClass=rcc1[[7]]$consensusClass
+getBarData=function(x,rccClass){
+  tb=names(table(x))
+  tbs=cbind()
+  for(rc in unique(rccClass)){
+    r1=table(x[which(rccClass==rc)])/sum(table(x[which(rccClass==rc)]))
+    r1=r1[match(tb,names(r1))]
+    r1[is.na(r1)]=0
+    tbs=cbind(tbs,r1)
+  }
+  dt=tbs
+  row.names(dt)=tb
+  colnames(dt)=paste0('Cluser',unique(rccClass))
+  return(dt)
+}
+
+par(mfrow=c(2,3))
+
+barplot(getBarData(clinical.T,rccClass),col = rainbow(6),main = 'Clinical.T')
+legend("topleft", row.names(getBarData(clinical.T,rccClass)), cex=0.8, fill=rainbow(6))
+
+barplot(getBarData(clinical.N,rccClass),col = rainbow(6),main = 'Clinical.N')
+legend("topleft", row.names(getBarData(clinical.N,rccClass)), cex=0.8, fill=rainbow(6))
+
+barplot(getBarData(clinical.M,rccClass),col = rainbow(6),main = 'Clinical.M')
+legend("topleft", row.names(getBarData(clinical.M,rccClass)), cex=0.8, fill=rainbow(6))
+
+barplot(getBarData(clinical.Stage,rccClass),col = rainbow(6),main = 'Clinical.Stage')
+legend("topleft", row.names(getBarData(clinical.Stage,rccClass)), cex=0.8, fill=rainbow(6))
+
+tnms=clean_TNMStage(clinical.T,clinical.N,clinical.M,clinical.Stage)
+getPlotTNMStageCount(tnms,gp = paste0('C',rccClass))
+
+
+
+#class(paste0('C',rccClass))
+
+table(tnms[,3])
+#barplot(getBarData(clinical.Grade),col = rainbow(6),main = 'Clinical.Grade')
+#legend("topleft", row.names(getBarData(clinical.Grade)), cex=0.8, fill=rainbow(6))
+
+boxplot(clinical.age[which(rcc[[7]]$consensusClass==1)]
+        ,clinical.age[which(rcc[[7]]$consensusClass==2)]
+        ,clinical.age[which(rcc[[7]]$consensusClass==3)]
+        ,clinical.age[which(rcc[[7]]$consensusClass==4)]
+        ,clinical.age[which(rcc[[7]]$consensusClass==5)]
+        ,clinical.age[which(rcc[[7]]$consensusClass==6)]
+        ,clinical.age[which(rcc[[7]]$consensusClass==7)],main='Age'
+)
+
+fig3E=mg_violin(data.frame(paste0('C',rcc[[7]]$consensusClass)
+                           ,clinical.age),melt = T,jitter=F,show_compare=T
+                ,cmp_test_method = 'wilcox.test'
+                ,ylab = 'Age')
+savePDF('Fig3E.pdf',plot = fig1D,width = 6,height = 8)
+
+
+
+
+plotKMCox(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0)
+                     ,factor(paste0('Cluster',rcc1[[7]]$consensusClass))))
+
+par(mfrow=c(3,7))
+for(i in 1:6){
+  for(j in (i+1):7){
+    plotKMCox(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0)
+                         ,factor(paste0('Cluster',rcc1[[7]]$consensusClass)))[which(rcc1[[7]]$consensusClass==i|rcc1[[7]]$consensusClass==j),])
+  }
+}
+
+clust.cpg.data=apply(test.sig.data,1,function(x){
+  x=as.numeric(x)
+  return(c(mean(x[which(rcc[[7]]$consensusClass==1)])
+           ,mean(x[which(rcc[[7]]$consensusClass==2)])
+           ,mean(x[which(rcc[[7]]$consensusClass==3)])
+           ,mean(x[which(rcc[[7]]$consensusClass==4)])
+           ,mean(x[which(rcc[[7]]$consensusClass==5)])
+           ,mean(x[which(rcc[[7]]$consensusClass==6)])
+           ,mean(x[which(rcc[[7]]$consensusClass==7)])
+  ))
+})
+
+clust.cpg.data=t(clust.cpg.data)
+colnames(clust.cpg.data)=c('Cluster1','Cluster2','Cluster3','Cluster4','Cluster5','Cluster6','Cluster7')
+
+
+write.table(cbind(row.names(clust.cpg.data),rep('',nrow(clust.cpg.data)),rep('',nrow(clust.cpg.data)),rep('',nrow(clust.cpg.data)),clust.cpg.data),file = 'mean.Cpg.txt',sep = '\t'
+          ,row.names = F,quote = F)
+
+#load("muti.cox.result.RData")
+#head(muti.cox.result)
+#which(muti.cox.result<0.05)n
+#3.18
+#methy.specific=read.csv('QDMR/Results2/DCMRsTable.txt',sep = '\t',stringsAsFactors = F)
+methy.specific=read.csv('QDMR/Results/SpecificityTable.txt',sep = '\t',stringsAsFactors = F)
+dim(methy.specific)
+
+clinical.N
+
+methy.specific=methy.specific[which(apply(methy.specific[,7:13],1,sd)>0),]
+dim(methy.specific)
+
+methy.specific=methy.specific[which(methy.specific[,6]<4.18),]
+dim(methy.specific)
+
+dim(methy.specific)
+head(methy.specific)
+min(methy.specific[,6])
+plot(methy.specific[,6],methy.specific[,6])
+
+library(pheatmap)
+mt=t(apply(methy.specific[,7:13],1,function(x){
+  x[which(x>0)]=1
+  x[which(x<0)]=-1
+  x[which(x==0)]=-2
+  return(x)
+}))
+pheatmap(mt[order(mt[,1]),][order(mt[,2]),]
+         #[order(mt[,3]),][order(mt[,4]),][order(mt[,5]),][order(mt[,6]),]
+,cluster_cols = F
+,cluster_rows = F
+)
+
+shet=apply(methy.specific[,7:13],1,function(x){
+  u=max(x)-0
+  d=0-min(x)
+  if(u>d){
+    x[which(x!=max(x))]=0
+    x[which(x==max(x))]=1
+  }else{
+    x[which(x!=min(x))]=0
+    x[which(x==min(x))]=-1
+  }
+  return(x)
+})
+#pheatmap(t(shet))
+pheatmap(t(shet[,c(which(shet[1,]==1)
+                   ,which(shet[1,]==-1)
+                   ,which(shet[2,]==1)
+                   ,which(shet[2,]==-1)
+                   ,which(shet[3,]==1)
+                   ,which(shet[3,]==-1),which(shet[4,]==1)
+                   ,which(shet[4,]==-1),which(shet[5,]==1)
+                   ,which(shet[5,]==-1),which(shet[6,]==1)
+                   ,which(shet[6,]==-1)
+                   #,which(shet[7,]==1)
+                   #,which(shet[7,]==-1)
+                   )])
+         ,cluster_rows = F,cluster_cols = F,colorRampPalette(c("navy", "white", "firebrick3"))(50)
+         ,border_color = NA)
+
+dim(methy.specific[,6:12])
+
+cpgAnno=read.csv('CpG.Anno.clear.txt',sep = '\t',stringsAsFactors = F)
+head(cpgAnno)
+cpgAnno=cpgAnno[!is.na(match(cpgAnno[,1],methy.specific[,2])),]
+length(unique(cpgAnno[,5]))
+
+mx.inds=apply(methy.specific[,7:13],1,function(x){
+  return(which.max(abs(x)))
+})
+
+methy.specific$C.all=paste0('C',mx.inds)
+
+cpgAnno$Cluster=methy.specific$C.all[match(cpgAnno$CpG,methy.specific$X)]
+
+
+write.table(methy.specific,file = 'S10_Table.txt',sep = '\t',quote = F,row.names = F)
+
+write.table(cpgAnno,file = 'review1/methy.specific.Cpg.anno_v2.txt',sep = '\t',quote = F,row.names = F)
+
+
+###############
+library('hgu133plus2.db')
+anno=select(hgu133plus2.db,unique(cpgAnno[,5]),keytype = 'SYMBOL',columns=c('ENTREZID','SYMBOL','GENENAME','ENSEMBL'))
+
+rna.exp=read.csv('RNA-Seq/HTSeq - FPKM.merge.txt',sep = '\t',row.names = 1,check.names=F)
+
+rns.sig.inds=match(anno[,4],gsub('\\..*$','',row.names(rna.exp)))
+rns.sig.inds=rns.sig.inds[!is.na(rns.sig.inds)]
+length(unique(rns.sig.inds))
+rna.exp=rna.exp[unique(rns.sig.inds),]
+test.rna.inds=match(colnames(test.data),colnames(rna.exp))
+rna.rcc=rcc[[7]]$consensusClass[which(!is.na(test.rna.inds))]
+test.rna.exp=rna.exp[,test.rna.inds[which(!is.na(test.rna.inds))]]
+dim(test.rna.exp)
+
+annotation_row1 = data.frame(
+  SampleClass = factor(rna.rcc)
+)
+rownames(annotation_row1) = names(rna.rcc)
+
+bk = unique(c(seq(-3,3, length=100)))
+pheatmap(log10(1+test.rna.exp[which(apply(test.rna.exp[,order(rna.rcc)],1,sum)>0),order(rna.rcc)]),cluster_cols = F
+         ,annotation_col = annotation_row1
+         ,scale = 'row'
+         ,breaks = bk)
+
+write.table(cbind(row.names(test.rna.exp),test.rna.exp),file = 'test.rna.exp.txt',sep = '\t',quote = F
+            ,row.names = F)
+dim(test.rna.exp)
+
+test.rna.exp[
+          which(apply(test.rna.exp[,order(rna.rcc)],1,sum)>0)
+          ,order(rna.rcc)
+      ]
+
+columns(hgu133plus2.db)
+
+
+anno[,2]
+
+cpgAnno
+
+library('clusterProfiler')
+
+head(cpgAnno)
+
+bps=list()
+for(i in 1:7){
+anno=select(hgu133plus2.db,unique(cpgAnno[which(cpgAnno$Cluster==paste0('C',i)),5]),keytype = 'SYMBOL',columns=c('ENTREZID','SYMBOL','GENENAME','ENSEMBL'))
+#kk <- enrichKEGG(gene         = anno[,2],
+#                 organism     = 'hsa',
+#                 pvalueCutoff = 0.5)
+bp=enrichGO(anno[,2], 'org.Hs.eg.db', ont="BP", pvalueCutoff=0.05,qvalueCutoff = 1, minGSSize = 1)
+bps=c(bps,list(bp))
+}
+
+g1=dotplot(bps[[1]])
+g2=dotplot(bps[[2]])
+g3=dotplot(bps[[3]])
+g4=dotplot(bps[[4]])
+g5=dotplot(bps[[5]])
+g6=dotplot(bps[[6]])
+g7=dotplot(bps[[7]])
+
+ggpubr::ggarrange(plotlist=list(g1,g3,g5,g7)
+                  ,ncol = 2,nrow = 2
+                  ,labels = toupper(letters)[1:4]
+                  ,align = "v")
+
+
+summary(kk)
+
+summary(bp)
+
+
+dim(methy.specific)
+head(methy.specific)
+
+#methy.specific=methy.specific[which(apply(methy.specific[,7:12],1,function(x){return(sum(x==0))})==5),]
+
+#methy.specific[,2]
+
+#sum(vd.cox.result[match(methy.specific[,2],row.names(vd.cox.result)),1]<0.05)
+
+#length(methy.specific[,2])
+
+clust=pheatmap(test.data[match(methy.specific[,2],row.names(test.data)),][,order(rcc[[6]]$consensusClass)]
+         ,cluster_cols = F
+         ,annotation_col = annotation_row
+         )
+
+apply(methy.specific[,7:12],2,function(x){
+  return(c(sum(x>0),sum(x<0)))
+})
+
+specific.data=apply(methy.specific[,7:12],2,function(x){
+  x[which(x>0)]=1
+  x[which(x<0)]=-1
+  return(x)
+})
+head(specific.data)
+colnames(methy.specific[,7:12])
+row.names(specific.data)=methy.specific[,2]
+colnames(specific.data)=paste0('Cluster',1:6)
+
+pheatmap(specific.data,
+colorRampPalette(c("navy", "white", "firebrick3"))(50),
+cluster_cols = T
+,cluster_rows = T
+)
+
+load('vd.clinical.RData')
+load('vd.data.RData')
+
+dim(vd.data)
+
+pheatmap(methy.specific[,13:18])
+
+clust=pheatmap(test.data[match(methy.specific[,2],row.names(test.data)),])
+plotKMCox(data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),cutree(clust$tree_col,2)))
+
+clust=pheatmap(vd.data[match(methy.specific[,2],row.names(vd.data)),])
+plotKMCox(data.frame(vd.clinical[,1],ifelse(vd.clinical[,2]=='Dead',1,0),cutree(clust$tree_col,3)))
+
+
+
+library('e1071')
+library(ROCR)
+
+data(iris)
+head(iris)
+
+
+pres=c()
+tcls=c()
+for(i in 1:7){
+test.cl=factor(ifelse(rcc[[7]]$consensusClass==i,1,0))
+m=naiveBayes(
+            t(test.sig.data[match(methy.specific[,2],row.names(test.sig.data)),])
+             #,factor(ifelse(rcc[[6]]$consensusClass==2|rcc[[6]]$consensusClass==6,2,1))
+            ,test.cl
+            ,laplace = 1)
+pre_label <- predict(m, t(test.sig.data[match(methy.specific[,2],row.names(test.sig.data)),])
+                     , probability = TRUE)
+stat_res <- table(pre_label, test.cl)
+tcls=c(tcls,as.numeric(as.character(test.cl)))
+pres=c(pres,as.numeric(as.character(pre_label)))
+}
+
+pred <- prediction(pres,tcls)
+
+perf <- performance(pred,"auc")
+#plot(perf,colorize=TRUE)
+perf@y.values
+
+perf <- performance(pred,"tpr","fpr")
+plot(perf,colorize=TRUE)
+
+
+#stat_res
+
+#m$tables
+
+#table(factor(rcc[[6]]$consensusClass))
+dim(test.sig.data[match(methy.specific[,2],row.names(test.sig.data)),])
+
+m=naiveBayes(
+  t(test.sig.data[match(methy.specific[,2],row.names(test.sig.data)),])
+  ,factor(rcc[[7]]$consensusClass)
+  #factor(ifelse(rcc[[6]]$consensusClass==2|rcc[[6]]$consensusClass==6,2,1))
+  #,test.cl
+  ,laplace = 1)
+pre_label <- predict(m, t(test.sig.data[match(methy.specific[,2],row.names(test.sig.data)),])
+                     , probability = TRUE)
+
+stat_res <- table(pre_label, factor(rcc[[7]]$consensusClass))
+
+accurary <- (stat_res[1, 1] + stat_res[2, 2]+ stat_res[3, 3]+ stat_res[4, 4]+ stat_res[5, 5]+ stat_res[6, 6]+ stat_res[7, 7])/length(pre_label)
+
+#pre_prob <- attr(pre_label, "probabilities")
+
+#biocLite('ROCR')
+#install.packages('ROCR')
+
+#performance<-prop.table(table(pre_label,factor(rcc[[6]]$consensusClass)))
+#pred <- prediction(pre_prob[, 2], factor(rcc[[6]]$consensusClass))
+
+#perf <- performance(pred, "tpr", "fpr")
+#auc.tmp <- performance(performance, "auc")
+#auc.value <- auc.tmp$y.values
+
+#AUC <- round(auc.value[[1]], digits = 4)
+#auc.value
+
+#data(ROCR.simple)
+#pred <- prediction(ROCR.simple$predictions, ROCR.simple$labels)
+#perf <- performance(pred,"tpr","fpr")
+#plot(perf,colorize=TRUE)
+#ROCR.simple$predictions
+#ROCR.simple$labels
+#perf@y.values
+
+#pred <- prediction((as.numeric(as.character(pre_label)))
+#                   ,(as.numeric(as.character(factor(rcc[[6]]$consensusClass)))))
+
+#perf <- performance(pred,"tpr","fpr")
+#plot(perf,colorize=TRUE)
+
+boxplot(vd.clinical[,1],test.clinical[,1])
+
+match(names(rcc[[6]]$consensusClass),colnames(test.sig.data))
+
+boxplot(methy.specific[,6])
+#max(methy.specific[,6])
+sig.cpgs=methy.specific[,2]
+#[which(methy.specific[,6]<3.18)]
+
+length(sig.cpgs)
+load('vd.data.RData')
+load('vd.clinical.RData')
+
+#sig.cpgs=methy.specific[which(methy.specific[,6]<4),2]
+#length(sig.cpgs)
+#m=naiveBayes(
+#  t(test.sig.data[match(sig.cpgs,row.names(test.sig.data)),])
+#  ,factor(rcc[[7]]$consensusClass)
+#  ,laplace = 1)
+
+#length(methy.specific[,2])
+
+#pre_label <- predict(m, t(test.sig.data[match(methy.specific[,2],row.names(test.sig.data)),])
+#                     , probability = TRUE)
+
+#table(pre_label
+#      , factor(rcc[[6]]$consensusClass))
+
+pr.cls=predict(m,t(vd.data[match(sig.cpgs,row.names(vd.data)),]), probability = TRUE)
+table(pr.cls)
+plotKMCox(data.frame(vd.clinical[,1],ifelse(vd.clinical[,2]=='Dead',1,0)
+                     ,pr.cls)[which(vd.clinical[,1]<3650),]
+          #[which(vd.clinical[,1]<3650),]
+          #[which(pr.cls==2|pr.cls==1),]
+)
+par(mfrow=c(3,7))
+for(i in 1:6){
+  for(j in (i+1):7){
+    plotKMCox(data.frame(vd.clinical[,1],ifelse(vd.clinical[,2]=='Dead',1,0)
+                         ,paste0('Cluster',pr.cls))[which(vd.clinical[,1]<13650&(pr.cls==i|pr.cls==j)),])
+  }
+}
+
+vd.clinical$A3_T
+
+vd.clinical.T=as.character(vd.clinical[,3])
+table(vd.clinical.T)
+vd.clinical.T[grep('T1',vd.clinical.T)]='T1'
+vd.clinical.T[grep('T2',vd.clinical.T)]='T2'
+vd.clinical.T[grep('T3',vd.clinical.T)]='T3'
+vd.clinical.T[grep('T4',vd.clinical.T)]='T4'
+vd.clinical.T[which(vd.clinical.T=='TX')]=NA
+vd.clinical.T[which(vd.clinical.T=='')]=NA
+vd.clinical.T[which(vd.clinical.T=='Tis')]=NA
+table(vd.clinical.T)
+
+vd.clinical.N=as.character(vd.clinical[,4])
+vd.clinical.N[grep('N1',vd.clinical.N)]='N1'
+vd.clinical.N[grep('N2',vd.clinical.N)]='N2'
+vd.clinical.N[grep('N3',vd.clinical.N)]='N3'
+
+vd.clinical.N[which(vd.clinical.N=='')]=NA
+vd.clinical.N[which(vd.clinical.N=='NX')]=NA
+table(vd.clinical.N)
+
+vd.clinical.M=as.character(vd.clinical[,5])
+vd.clinical.M[grep('M1',vd.clinical.M)]='M1'
+vd.clinical.M[which(vd.clinical.M=='')]=NA
+table(vd.clinical.M)
+
+vd.clinical.Stage=as.character(vd.clinical[,6])
+table(vd.clinical.Stage)
+vd.clinical.Stage<-gsub("[ABC]","",vd.clinical.Stage,perl=T)
+vd.clinical.Stage[which(vd.clinical.Stage=='')]=NA
+vd.clinical.Stage[which(vd.clinical.Stage=='Stage 0')]=NA
+table(vd.clinical.Stage)
+
+vd.clinical.age=as.numeric(as.character(vd.clinical$age_at_initial_pathologic_diagnosis))
+vd.clinical.genter=as.character(vd.clinical$gender)
+table(vd.clinical.genter)
+
+par(mfrow=c(2,2))
+
+barplot(getBarData(vd.clinical.T,pr.cls),col = rainbow(6),main = 'Clinical.T')
+legend("topleft", row.names(getBarData(vd.clinical.T,pr.cls)), cex=0.8, fill=rainbow(6))
+
+barplot(getBarData(vd.clinical.N,pr.cls),col = rainbow(6),main = 'Clinical.N')
+legend("topleft", row.names(getBarData(clinical.N,pr.cls)), cex=0.8, fill=rainbow(6))
+
+barplot(getBarData(vd.clinical.M,pr.cls),col = rainbow(6),main = 'Clinical.M')
+legend("topleft", row.names(getBarData(clinical.M,pr.cls)), cex=0.8, fill=rainbow(6))
+
+barplot(getBarData(vd.clinical.Stage,pr.cls),col = rainbow(6),main = 'Clinical.Stage')
+legend("topleft", row.names(getBarData(vd.clinical.Stage,pr.cls)), cex=0.8, fill=rainbow(6))
+
+
+vd.tnms=clean_TNMStage(vd.clinical$A3_T,vd.clinical$A4_N,vd.clinical$A5_M,vd.clinical$A6_Stage)
+getPlotTNMStageCount(vd.tnms,gp = paste0('C',pr.cls))
+
+
+boxplot(vd.clinical.age[which(pr.cls==1)]
+        ,vd.clinical.age[which(pr.cls==2)]
+        ,vd.clinical.age[which(pr.cls==3)]
+        ,vd.clinical.age[which(pr.cls==4)]
+        ,vd.clinical.age[which(pr.cls==5)]
+        ,vd.clinical.age[which(pr.cls==6)]
+        ,vd.clinical.age[which(pr.cls==7)]
+        ,main='Age'
+)
+
+
+
+order(pr.cls)
+
+annotation_row2 = data.frame(
+  SampleClass = factor(pr.cls)
+)
+rownames(annotation_row2) = colnames(vd.data)
+pheatmap(vd.data[match(methy.specific[,2],row.names(vd.data)),order(pr.cls)]
+         ,cluster_cols = F
+         ,annotation_col = annotation_row2)
+
+
+dat1=data.frame(vd.clinical[,1],ifelse(vd.clinical[,2]=='Dead',1,0),pr.cls)
+dat2=data.frame(test.clinical[,1],ifelse(test.clinical[,2]=='Dead',1,0),rcc[[6]]$consensusClass)
+
+par(mfrow=c(2,3))  
+for(i in 1:6){
+  dat1.inds=which(dat1[,3]==i)  
+  dat2.inds=which(dat2[,3]==i)  
+  dat=data.frame(c(dat1[dat1.inds,1],dat2[dat2.inds,1])
+             ,c(dat1[dat1.inds,2],dat2[dat2.inds,2])
+             ,c(rep('VD',length(dat1.inds)),rep('test',length(dat2.inds)))
+  )
+  plotKMCox(dat)
+          #[which(pr.cls==2|pr.cls==1),]
+}
+
+
+
+vd.clinical.age=as.numeric(as.character(vd.clinical$age_at_initial_pathologic_diagnosis))
+boxplot(vd.clinical.age[which(pr.cls==1)]
+        ,vd.clinical.age[which(pr.cls==2)]
+        ,vd.clinical.age[which(pr.cls==3)]
+        ,vd.clinical.age[which(pr.cls==4)]
+        ,vd.clinical.age[which(pr.cls==5)]
+        ,vd.clinical.age[which(pr.cls==6)],main='Age'
+)
+
+
+
+
+coxFun(data.frame(vd.clinical[,1],ifelse(vd.clinical[,2]=='Dead',1,0),factor(pr.cls)))
+
+
+boxplot(vd.age[which(pr.cls==1)]
+        ,vd.age[which(pr.cls==2)]
+        ,vd.age[which(pr.cls==3)]
+        ,vd.age[which(pr.cls==4)]
+        ,vd.age[which(pr.cls==5)]
+        ,vd.age[which(pr.cls==6)]
+        ,main='Age'
+)
+
+
