@@ -839,5 +839,3 @@ boxplot(vd.age[which(pr.cls==1)]
         ,vd.age[which(pr.cls==6)]
         ,main='Age'
 )
-
-
