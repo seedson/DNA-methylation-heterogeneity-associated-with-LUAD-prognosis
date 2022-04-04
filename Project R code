@@ -1,4 +1,4 @@
-setwd('E:/work_backup/MG20180831_fxa_methy')
+setwd('E:/work)
 load('test.clinical.RData')
 load('test.data.RData')
 load('test.cox.result.RData')
@@ -168,7 +168,7 @@ load('ConsensusClusterPlus.result.RData')
 
 table(rcc1[[7]]$consensusClass)
 
-source('Z:/projects/codes/mg_base.R')
+source('Z:/projects')
 
 enrich=ssGSEA_batch(TCGAcode = 'LUAD')
 cmp=intersect(colnames(enrich$KEGG),
@@ -346,11 +346,11 @@ boxplot(clinical.age[which(rcc[[7]]$consensusClass==1)]
         ,clinical.age[which(rcc[[7]]$consensusClass==7)],main='Age'
 )
 
-fig3E=mg_violin(data.frame(paste0('C',rcc[[7]]$consensusClass)
+fig=mg_violin(data.frame(paste0('C',rcc[[7]]$consensusClass)
                            ,clinical.age),melt = T,jitter=F,show_compare=T
                 ,cmp_test_method = 'wilcox.test'
                 ,ylab = 'Age')
-savePDF('Fig3E.pdf',plot = fig1D,width = 6,height = 8)
+savePDF('Fig.pdf',plot = fig,width = 6,height = 8)
 
 
 
